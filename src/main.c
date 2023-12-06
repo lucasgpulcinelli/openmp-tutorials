@@ -3,10 +3,7 @@
 #include <stdlib.h>
 
 int main() {
-  int threads = 8;
-
-  omp_set_num_threads(threads);
-
+  int threads;
   int steps = 1000000000;
   double step = 1 / (double)steps;
   double result = 0;
@@ -14,16 +11,14 @@ int main() {
   double time = omp_get_wtime();
 #pragma omp parallel
   {
+    double sum = 0;
     int id = omp_get_thread_num();
-
-    int threads_real = omp_get_num_threads();
     if (id == 0) {
-      threads = threads_real;
+      threads = omp_get_num_threads();
     }
 
-    double sum = 0;
-    for (int i = id * (steps / threads_real);
-         i < (steps / threads_real) * (id + 1); i++) {
+#pragma omp for schedule(static)
+    for (int i = 0; i < steps; i++) {
       double x = (i + 0.5) * step;
       sum += 4 / (1 + x * x);
     }
