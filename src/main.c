@@ -1,78 +1,84 @@
-/*
-**  PROGRAM: Mandelbrot area
-**
-**  PURPOSE: Program to compute the area of a  Mandelbrot set.
-**           Correct answer should be around 1.510659.
-**           WARNING: this program may contain errors
-**
-**  USAGE:   Program runs without input ... just run the executable
-**
-**  HISTORY: Written:  (Mark Bull, August 2011).
-**           Changed "comples" to "d_comples" to avoid collsion with
-**           math.h complex type (Tim Mattson, September 2011)
-*/
-
-#include <math.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#define NPOINTS 1000
-#define MAXITER 1000
-
-struct d_complex {
-  double r;
-  double i;
-};
-
-void testpoint(struct d_complex);
-
-int numoutside = 0;
-
-int main() {
-  const double eps = 1.0e-5;
-
-  //   Loop over grid of points in the complex plane which contains the
-  //   Mandelbrot set, testing each point to see whether it is inside or outside
-  //   the set.
-
-#pragma omp parallel for default(shared)
-  for (int i = 0; i < NPOINTS; i++) {
-    for (int j = 0; j < NPOINTS; j++) {
-      struct d_complex c;
-      c.r = -2.0 + 2.5 * (double)(i) / (double)(NPOINTS) + eps;
-      c.i = 1.125 * (double)(j) / (double)(NPOINTS) + eps;
-      testpoint(c);
-    }
-  }
-
-  // Calculate area of set and error estimate and output the results
-
-  double area = 2.0 * 2.5 * 1.125 * (double)(NPOINTS * NPOINTS - numoutside) /
-                (double)(NPOINTS * NPOINTS);
-  double error = area / (double)NPOINTS;
-
-  printf("Area of Mandlebrot set = %12.8f +/- %12.8f\n", area, error);
-  printf("Correct answer should be around 1.510659\n");
+void swap(int *a, int *b) {
+  int tmp = *a;
+  *a = *b;
+  *b = tmp;
 }
 
-void testpoint(struct d_complex c) {
+int partition(int *arr, int s, int e) {
+  int pivot = arr[s];
+  int i = s + 1;
 
-  // Does the iteration z=z*z+c, until |z| > 2 when point is known to be outside
-  // set If loop count reaches MAXITER, point is considered to be inside the set
-
-  struct d_complex z;
-  double temp;
-
-  z = c;
-  for (int iter = 0; iter < MAXITER; iter++) {
-    temp = (z.r * z.r) - (z.i * z.i) + c.r;
-    z.i = z.r * z.i * 2 + c.i;
-    z.r = temp;
-    if ((z.r * z.r + z.i * z.i) > 4.0) {
-#pragma omp atomic
-      numoutside++;
-      break;
+  // I don't think this is parallelizable
+  for (int j = s + 1; j <= e; j++) {
+    if (arr[j] < pivot) {
+      swap(arr + i, arr + j);
+      i++;
     }
   }
+
+  swap(arr + i - 1, arr + s);
+  return i - 1;
+}
+
+void quicksort(int *arr, int s, int e) {
+  if (s >= e) {
+    return;
+  }
+
+  int pivot = partition(arr, s, e);
+
+  if (pivot - 1 - s < 500) {
+    quicksort(arr, s, pivot - 1);
+  } else {
+#pragma omp task
+    quicksort(arr, s, pivot - 1);
+  }
+
+  if (pivot + 1 - e < 500) {
+    quicksort(arr, pivot + 1, e);
+  } else {
+#pragma omp task
+    quicksort(arr, pivot + 1, e);
+  }
+}
+
+int *initarr(uint64_t seed, int size, int mod) {
+  srand(seed);
+  int *arr = malloc(sizeof(int) * size);
+
+  // Is it possible to parallelize this?
+  // In size = 1e8 the initalization time is more than 1/3 of the total time!
+  for (int i = 0; i < size; i++) {
+    arr[i] = rand() % mod;
+  }
+
+  return arr;
+}
+
+void printarr(int *arr, int size) {
+  for (int i = 0; i < size; i++) {
+    printf("%d ", arr[i]);
+  }
+  printf("\n");
+  printf("\n");
+}
+
+int main(void) {
+  int size = 1e8;
+  double start = omp_get_wtime();
+  int *arr = initarr(0, size, RAND_MAX);
+
+
+#pragma omp parallel
+#pragma omp single nowait
+  quicksort(arr, 0, size - 1);
+
+  double end = omp_get_wtime();
+
+  printf("%f\n", end - start);
+  free(arr);
 }
