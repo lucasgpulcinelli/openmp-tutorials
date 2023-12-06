@@ -1,31 +1,78 @@
+/*
+**  PROGRAM: Mandelbrot area
+**
+**  PURPOSE: Program to compute the area of a  Mandelbrot set.
+**           Correct answer should be around 1.510659.
+**           WARNING: this program may contain errors
+**
+**  USAGE:   Program runs without input ... just run the executable
+**
+**  HISTORY: Written:  (Mark Bull, August 2011).
+**           Changed "comples" to "d_comples" to avoid collsion with
+**           math.h complex type (Tim Mattson, September 2011)
+*/
+
+#include <math.h>
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#define NPOINTS 1000
+#define MAXITER 1000
+
+struct d_complex {
+  double r;
+  double i;
+};
+
+void testpoint(struct d_complex);
+
+int numoutside = 0;
+
 int main() {
-  int threads;
-  int steps = 1000000000;
-  double step = 1 / (double)steps;
+  const double eps = 1.0e-5;
 
-  double time = omp_get_wtime();
+  //   Loop over grid of points in the complex plane which contains the
+  //   Mandelbrot set, testing each point to see whether it is inside or outside
+  //   the set.
 
-  double sum = 0;
-
-#pragma omp parallel
-  {
-
-#pragma omp master
-    { threads = omp_get_num_threads(); }
-
-#pragma omp for reduction(+ : sum) nowait
-    for (int i = 0; i < steps; i++) {
-      double x = (i + 0.5) * step;
-      sum += 4 / (1 + x * x);
+#pragma omp parallel for default(shared)
+  for (int i = 0; i < NPOINTS; i++) {
+    for (int j = 0; j < NPOINTS; j++) {
+      struct d_complex c;
+      c.r = -2.0 + 2.5 * (double)(i) / (double)(NPOINTS) + eps;
+      c.i = 1.125 * (double)(j) / (double)(NPOINTS) + eps;
+      testpoint(c);
     }
   }
 
-  sum *= step;
+  // Calculate area of set and error estimate and output the results
 
-  printf("result: %f\ntook %f seconds\nwith %d threads\n", sum,
-         omp_get_wtime() - time, threads);
+  double area = 2.0 * 2.5 * 1.125 * (double)(NPOINTS * NPOINTS - numoutside) /
+                (double)(NPOINTS * NPOINTS);
+  double error = area / (double)NPOINTS;
+
+  printf("Area of Mandlebrot set = %12.8f +/- %12.8f\n", area, error);
+  printf("Correct answer should be around 1.510659\n");
+}
+
+void testpoint(struct d_complex c) {
+
+  // Does the iteration z=z*z+c, until |z| > 2 when point is known to be outside
+  // set If loop count reaches MAXITER, point is considered to be inside the set
+
+  struct d_complex z;
+  double temp;
+
+  z = c;
+  for (int iter = 0; iter < MAXITER; iter++) {
+    temp = (z.r * z.r) - (z.i * z.i) + c.r;
+    z.i = z.r * z.i * 2 + c.i;
+    z.r = temp;
+    if ((z.r * z.r + z.i * z.i) > 4.0) {
+#pragma omp atomic
+      numoutside++;
+      break;
+    }
+  }
 }
