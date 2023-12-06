@@ -4,12 +4,12 @@
 
 int main() {
   int threads = 8;
-  double *results = malloc(sizeof(double) * threads);
 
   omp_set_num_threads(threads);
 
   int steps = 1000000000;
   double step = 1 / (double)steps;
+  double result = 0;
 
   double time = omp_get_wtime();
 #pragma omp parallel
@@ -21,23 +21,17 @@ int main() {
       threads = threads_real;
     }
 
-    double result = 0;
+    double sum = 0;
     for (int i = id * (steps / threads_real);
          i < (steps / threads_real) * (id + 1); i++) {
       double x = (i + 0.5) * step;
-      result += 4 / (1 + x * x);
+      sum += 4 / (1 + x * x);
     }
 
-    results[id] = result;
+#pragma omp critical
+    result += sum * step;
   }
 
-  double final = 0;
-  for (int i = 0; i < threads; i++) {
-    final += results[i];
-  }
-  final *= step;
-
-  printf("result: %f\ntook %f seconds\nwith %d threads\n", final, omp_get_wtime() - time, threads);
-
-  free(results);
+  printf("result: %f\ntook %f seconds\nwith %d threads\n", result,
+         omp_get_wtime() - time, threads);
 }
