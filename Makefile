@@ -1,5 +1,5 @@
-CFLAGS  += -std=c11 -Wall -Wextra
-LDFLAGS +=
+CFLAGS  += -std=c11 -fopenmp -Wall -Wextra
+LDFLAGS += -fopenmp
 
 EXECUTABLE ?= build/main
 CFILES      = $(shell find src/ -type f |grep '\.c')
