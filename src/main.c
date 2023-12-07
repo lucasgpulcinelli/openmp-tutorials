@@ -98,7 +98,11 @@ int *initarr(uint64_t seed, int size, int mod) {
     int id = omp_get_thread_num();
     int threads = omp_get_num_threads();
 
-    for (int i = 0; i < id + 1; i++) {
+    if (log2(threads) != floor(log2(threads))) {
+      threads = pow(2, floor(log2(threads)));
+    }
+
+    for (int i = 0; i < id + 1 && id < threads; i++) {
       arr[id] = getRandom() % mod;
     }
 
@@ -115,7 +119,7 @@ int *initarr(uint64_t seed, int size, int mod) {
       free(exponents);
     }
 
-    for (int i = id + threads; i < size; i += threads) {
+    for (int i = id + threads; i < size && id < threads; i += threads) {
       arr[i] = getRandom() % mod;
     }
   }
