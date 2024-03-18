@@ -1,12 +1,10 @@
 CFLAGS  += -std=c11 -fopenmp -Wall -Wextra
 LDFLAGS += -fopenmp -lm
 
-EXECUTABLE ?= build/main
-CFILES      = $(shell find src/ -type f |grep '\.c')
-OFILES      = $(patsubst src/%.c,build/obj/%.o, $(CFILES))
+PROJECT ?= main
+EXECUTABLE = build/$(PROJECT)
 
-
-.PHONY: all clean run debug
+.PHONY: all clean run debug $(PROJECT)
 
 
 all: $(EXECUTABLE)
@@ -22,7 +20,7 @@ debug: CFLAGS+=-g -O0
 debug: clean
 debug: $(EXECUTABLE)
 
-$(EXECUTABLE): $(OFILES)
+$(EXECUTABLE): build/obj/$(PROJECT).o
 	@mkdir -p build
 	$(CC) $(LDFLAGS) -o $@ $^
 
